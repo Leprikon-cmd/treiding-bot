@@ -30378,3 +30378,9 @@
 2025-04-30 00:33:41,123 - WARNING - ⏱️ CNYRUBrfd: вне торгового окна для RUB (07:00–20:00 МСК)
 2025-04-30 00:33:55,243 - WARNING - ⏱️ CNYRUBrfd: вне торгового окна для RUB (07:00–20:00 МСК)
 2025-04-30 00:34:09,853 - WARNING - ⏱️ CNYRUBrfd: вне торгового окна для RUB (07:00–20:00 МСК)
+2025-04-30 17:49:18,499 - INFO - 🔍 SL/TP расчёт для USDCHFrfd:
+  • price=0.82319, spread=0.00020, point=1e-05, stop_level=10
+  • SL=0.82361, TP=0.82277, min_distance=0.00040
+2025-04-30 17:49:18,553 - ERROR - ❌ Ошибка отправки ордера по USDCHFrfd: 10016
+📨 Запрос: {'action': 1, 'symbol': 'USDCHFrfd', 'volume': 0.01, 'type': 1, 'price': 0.82319, 'sl': 0.82361, 'tp': 0.82277, 'deviation': 10, 'type_filling': 0, 'comment': 'PriceActionMAStrategy_entry'}
+📩 Ответ: {'retcode': 10016, 'deal': 0, 'order': 0, 'volume': 0.0, 'price': 0.0, 'bid': 0.0, 'ask': 0.0, 'comment': 'Invalid stops', 'request_id': 0, 'retcode_external': 0, 'request': TradeRequest(action=1, magic=0, order=0, symbol='USDCHFrfd', volume=0.01, price=0.82319, stoplimit=0.0, sl=0.82361, tp=0.82277, deviation=10, type=1, type_filling=0, type_time=0, expiration=0, comment='PriceActionMAStrategy_entry', position=0, position_by=0)}

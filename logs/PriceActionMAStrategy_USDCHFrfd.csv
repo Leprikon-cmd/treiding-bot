@@ -34,3 +34,4 @@ timestamp,action,symbol,price,result
 2025-04-29T23:14:34.788408,entry,USDCHFrfd,0.82368,0.01,success
 2025-04-29T23:25:28.210672,entry,USDCHFrfd,0.82391,0.01,success
 2025-04-29T23:26:20.187236,entry,USDCHFrfd,0.82368,0.01,success
+2025-04-30T17:49:18.560148,entry,USDCHFrfd,0.82319,0.01,fail

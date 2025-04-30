@@ -39,7 +39,7 @@ def send_order(symbol, lot, order_type, price, sl_points=100, tp_points=100, com
     stop_level_points = symbol_info.trade_stops_level
     stop_level_price = stop_level_points * point
     spread = symbol_info.ask - symbol_info.bid
-    min_distance = max(stop_level_price, spread * 2, 10 * point)
+    min_distance = max(stop_level_price, spread * 2, 20 * point)
 
     # 🔧 SL и TP
     sl_p = max(sl_points * point, min_distance + 2 * point)
@@ -61,6 +61,13 @@ def send_order(symbol, lot, order_type, price, sl_points=100, tp_points=100, com
     if not symbol_info.visible or symbol_info.trade_mode != mt5.SYMBOL_TRADE_MODE_FULL:
         file_logger.warning(f"⚠️ Символ {symbol} недоступен для торговли: рынок закрыт или нет сессии.")
         return False
+
+    file_logger.warning(
+        f"[{symbol}] Проверка SL/TP:\n"
+        f"  • Цена: {price:.5f}, Спред: {spread:.5f}\n"
+        f"  • SL: {sl_price:.5f}, TP: {tp_price:.5f}\n"
+        f"  • Стоп-левел: {stop_level_points} пунктов ({stop_level_price:.5f}), min_distance: {min_distance:.5f}"
+    )
 
     request = {
         "action": mt5.TRADE_ACTION_DEAL,
