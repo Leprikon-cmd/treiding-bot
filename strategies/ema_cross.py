@@ -69,3 +69,29 @@ class EMARSIVolumeStrategy(StrategyBase):
         df = pd.DataFrame(rates)
         df = self._calculate_indicators(df)
         return abs(df['ema_fast'].iloc[-1] - df['ema_slow'].iloc[-1]) < df['close'].iloc[-1] * 0.001
+
+    def open_trade(self, action):
+        symbol_info = mt5.symbol_info(self.symbol)
+        if symbol_info is None:
+            print(f"Symbol {self.symbol} not found")
+            return False
+
+        price = mt5.symbol_info_tick(self.symbol).ask if action == "buy" else mt5.symbol_info_tick(self.symbol).bid
+        deviation = 20
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": self.symbol,
+            "volume": self.lot,
+            "type": mt5.ORDER_TYPE_BUY if action == "buy" else mt5.ORDER_TYPE_SELL,
+            "price": price,
+            "deviation": deviation,
+            "magic": 234000,
+            "comment": "ema_cross_strategy",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_RETURN,
+        }
+
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            print(f"❌ Ошибка отправки ордера: код={result.retcode}, сообщение={result.comment}")
+        return result.retcode == mt5.TRADE_RETCODE_DONE
