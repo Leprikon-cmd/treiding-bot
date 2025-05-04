@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+
+# macOS system files
+.DS_Store
+
+# Logs and reports
+logs/
+*.log
+*.csv
+*.xlsx
+*.pdf
+
+# VSCode settings
+.vscode/
+
+# Compiled objects
+*.so
+
+# Windows thumbnail db
+Thumbs.db
+
+# PyInstaller
+*.spec
+dist/
+build/
+
+# MT5 cache / config / terminals if somehow synced
+*.ini
+*.set
+
+# Git and GitHub
+*.swp
+*.bak
+*.tmp
