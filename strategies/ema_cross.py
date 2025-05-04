@@ -50,8 +50,8 @@ class EMARSIVolumeStrategy(StrategyBase):
         if last['volume_avg'] == 0 or last['tick_volume'] == 0:
             return None
 
-        ema_cross_up = last['ema_fast'] > last['ema_slow']
-        ema_cross_down = last['ema_fast'] < last['ema_slow']
+        ema_cross_up = last['ema_fast'] > last['ema_slow'] and df['ema_fast'].iloc[-2] <= df['ema_slow'].iloc[-2]
+        ema_cross_down = last['ema_fast'] < last['ema_slow'] and df['ema_fast'].iloc[-2] >= df['ema_slow'].iloc[-2]
         volume_ok = last['tick_volume'] > last['volume_avg'] * self.volume_threshold
         rsi_buy_zone = last['rsi'] < self.rsi_oversold + 10
         rsi_sell_zone = last['rsi'] > self.rsi_overbought - 10
@@ -62,6 +62,7 @@ class EMARSIVolumeStrategy(StrategyBase):
         if ema_cross_down and volume_ok and rsi_sell_zone:
          return "sell"
 
+        print(f"[{self.symbol}] no signal | ema_fast: {last['ema_fast']:.5f}, ema_slow: {last['ema_slow']:.5f}, rsi: {last['rsi']:.2f}, volume: {last['tick_volume']}, avg_volume: {last['volume_avg']:.2f}")
         return None
 
     def check_exit_signal(self, rates):
