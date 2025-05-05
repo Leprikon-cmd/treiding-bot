@@ -1,3 +1,16 @@
+"""
+Конфигурация робота:
+• STRATEGY_ALLOCATION — распределение капитала по стратегиям
+• SYMBOLS            — перечень торговых инструментов
+• LOT                — дефолтный объём
+• ATR_SETTINGS       — параметры ATR для SL/TP
+• MIN_STOP_POINTS    — минимальные безопасные стопы
+• RUB_MARKET_HOURS   — торговые часы для рублёвых пар
+• BREAK_EVEN_ATR/...  — параметры безубытка и трейлинга
+"""
+from typing import Dict, List
+
+# ┌─── БЛОК 1: Распределение капитала и базовые настройки ───────────────
 #Бюджеты стратегий
 STRATEGY_ALLOCATION = {
     "PriceActionMAStrategy": 0.2,   # 20% от счёта
@@ -20,9 +33,14 @@ SYMBOLS = [
     "CNYRUBrfd",
 ]
 
-# Лот по умолчанию
-LOT = 0.01
+# процент риска на одну сделку от текущего баланса
+RISK_PER_TRADE = 0.02  # 2%
 
+# минимальный и максимальный объём в лотах
+MIN_LOT = 0.01
+MAX_LOT = 1.0
+
+# ┌─── БЛОК 2: Параметры стратегий (ATR / минимальные стопы) ─────────
 # ATR-based dynamic SL/TP settings per strategy
 ATR_SETTINGS = {
     "PriceActionMAStrategy":    { "period":14, "sl_multiplier":1.5, "tp_multiplier":2.0 },
@@ -45,12 +63,12 @@ MIN_STOP_POINTS = {
     "CNYRUBrfd": 50,
 }
 
-from datetime import time
-
-# Часы торговли по Москве для RUB-пар (07:00 — 20:00)
+# ┌─── БЛОК 3: Торговые часы и рублёвые символы ─────────────────────
+from datetime import time, timezone, timedelta
+MSK = timezone(timedelta(hours=3))
 RUB_MARKET_HOURS = {
-    "start": time(7, 0),   # 07:00
-    "end": time(20, 0),    # 20:00
+    "start": time(7, 0, tzinfo=MSK),
+    "end":   time(20, 0, tzinfo=MSK),
 }
 
 RUB_SYMBOLS = [
@@ -59,6 +77,7 @@ RUB_SYMBOLS = [
     "CNYRUBrfd",
 ]
 
+# ┌─── БЛОК 4: Параметры безубыточности и трейлинг-стопа ───────────
 # ATR-based break-even and trailing stop settings per strategy
 BREAK_EVEN_ATR = {
     "PriceActionMAStrategy": 1.0,
@@ -79,4 +98,21 @@ TRAILING_STEP_ATR = {
     "EMARSIVolumeStrategy": 0.5,
     "VWAPStrategy": 0.5,
     "CCIDivergenceStrategy": 0.5,
+}
+
+# ┌─── БЛОК 5: Порог спреда и magic numbers ─────────────────────────
+# максимально допустимый спред (в пунктах) по каждой паре
+SPREAD_THRESHOLD = {
+    "default": 0.0005,
+    "USDRUBrfd": 0.5,
+    "EURRUBrfd": 0.5,
+    "CNYRUBrfd": 0.5,
+}
+
+# уникальные magic-числа для каждой стратегии
+MAGIC_NUMBERS = {
+    "PriceActionMAStrategy": 101,
+    "EMARSIVolumeStrategy": 102,
+    "VWAPStrategy":         103,
+    "CCIDivergenceStrategy":104,
 }

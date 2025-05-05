@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
-import MetaTrader5 as mt5
+import MetaTrader5 as mt5 # игнорировать проверку типов
+from utils.risk import calculate_raw_lot, adjust_lot, max_affordable_lot
+from config.settings import DEFAULT_RISK_PERCENT
 
 class StrategyBase(ABC):
     def __init__(self, symbol, lot, tp=50, sl=0):
@@ -44,11 +46,34 @@ class StrategyBase(ABC):
                 break
 
         return round(max(max_lot, 0.01), 2)
-
-    @abstractmethod
-    def check_entry_signal(self, rates):
+    
+    def check_entry_signal(self):
         pass
 
-    @abstractmethod
-    def check_exit_signal(self, rates):
-        pass
+    def calculate_lot(self, symbol_info, entry_price: float, sl_price: float) -> float:
+        """
+        Рассчитывает размер позиции на основе фиксированного процента риска от текущего баланса
+        и расстояния между ценой входа и стоп-лоссом с помощью утилит управления риском.
+        """
+        # получаем текущий баланс
+        balance = mt5.account_info().balance
+        # сумма риска на одну сделку
+        risk_amount = balance * DEFAULT_RISK_PERCENT
+        # первоначальный лот на основе суммы риска и дистанции до SL
+        raw_lot = calculate_raw_lot(
+            risk_amount,
+            sl_price,
+            entry_price,
+            symbol_info.trade_contract_size,
+            symbol_info.point
+        )
+        # корректируем согласно ограничениям брокера
+        adjusted = adjust_lot(
+            raw_lot,
+            symbol_info.volume_step,
+            symbol_info.volume_min,
+            symbol_info.volume_max
+        )
+        # проверяем доступность лота по марже
+        lot = max_affordable_lot(symbol_info.name, adjusted, entry_price)
+        return lot
