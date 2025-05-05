@@ -9,13 +9,8 @@ class StrategyBase(ABC):
         self.lot = lot
         self.tp = tp
         self.sl = sl
-        self.timeframe = self.get_timeframe()
 
-    def get_timeframe(self):
-        return mt5.TIMEFRAME_M5  # можно переопределить в конкретной стратегии
-
-    def get_rates(self):
-        return mt5.copy_rates_from_pos(self.symbol, self.timeframe, 0, 100)
+    # get_timeframe and get_rates removed; see below for abstract get_rates
 
     def calculate_lot(self, price, sl_points, budget, risk_percent=0.02):
         sl_distance = sl_points * price * 0.0001
@@ -48,6 +43,14 @@ class StrategyBase(ABC):
         return round(max(max_lot, 0.01), 2)
     
     def check_entry_signal(self):
+        pass
+
+    @abstractmethod
+    def get_rates(self):
+        """
+        Return historical data for the strategy.
+        Each strategy must implement this to fetch its own timeframe rates.
+        """
         pass
 
     def calculate_lot(self, symbol_info, entry_price: float, sl_price: float) -> float:
