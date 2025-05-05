@@ -76,15 +76,21 @@ class Trader:
                 print(f"{emoji} {self.symbol} — ❌ ⛔")
 
     def _try_open_order(self, signal, rates):
-        # динамический расчет SL/TP на основе ATR
+        # динамический расчет SL/TP на основе ATR (настройки для каждой стратегии)
         df_atr = pd.DataFrame(rates)
         df_atr['tr'] = df_atr['high'] - df_atr['low']
-        atr = df_atr['tr'].rolling(window=ATR_SETTINGS['period']).mean().iloc[-1]
+        strategy_atr = ATR_SETTINGS.get(self.strategy_name, {})
+        period = strategy_atr.get('period', 14)
+        sl_multiplier = strategy_atr.get('sl_multiplier', 1.5)
+        tp_multiplier = strategy_atr.get('tp_multiplier', 3.0)
+        atr = df_atr['tr'].rolling(window=period).mean().iloc[-1]
+
         symbol_info = mt5.symbol_info(self.symbol)
         point = symbol_info.point
-        # SL/TP в пунктах
-        sl_points = (ATR_SETTINGS['sl_multiplier'] * atr) / point
-        tp_points = (ATR_SETTINGS['tp_multiplier'] * atr) / point
+
+        # SL/TP в пунктах (расчёт через ATR)
+        sl_points = (sl_multiplier * atr) / point
+        tp_points = (tp_multiplier * atr) / point
 
         tick = mt5.symbol_info_tick(self.symbol)
         if tick is None:
