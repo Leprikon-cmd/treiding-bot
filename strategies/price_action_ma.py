@@ -15,16 +15,23 @@ class PriceActionMAStrategy(StrategyBase):
         return rates if rates is not None and len(rates) >= self.ma_period + 2 else None
 
     def _calculate_indicators(self, df):
+        # Скользящая средняя
         df['ma'] = df['close'].rolling(window=self.ma_period).mean()
+
+        # True Range (TR) в векторном виде
+        prev_close = df['close'].shift(1)
+        hl = df['high'] - df['low']
+        hc = (df['high'] - prev_close).abs()
+        lc = (df['low'] - prev_close).abs()
+        # объединяем и берём максимум по каждой строке
+        df['tr'] = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+
+        # ADX
         df['adx'] = self._calculate_adx(df)
-        # True Range for ATR
-        df['tr'] = df[['high','low','close']].apply(
-            lambda r: max(
-                r['high'] - r['low'],
-                abs(r['high'] - r['close'].shift(1).fillna(r['close'])),
-                abs(r['low']  - r['close'].shift(1).fillna(r['close']))
-            ), axis=1
-        )
+
+        # (опционально) можно убрать колонку tr, если она больше не нужна:
+        # df.drop(columns=['tr'], inplace=True)
+
         return df
 
     def _is_bullish_engulfing(self, df):
