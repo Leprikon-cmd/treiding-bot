@@ -96,3 +96,34 @@ def send_order(symbol, lot, order_type, price, sl_points=100, tp_points=100, com
             f"📩 Ответ: {result._asdict()}"
         )
         return False
+
+
+def close_order(position):
+    """Функция для закрытия позиции."""
+    action = mt5.ORDER_TYPE_SELL if position.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+    tick = mt5.symbol_info_tick(position.symbol)
+    if tick is None:
+        file_logger.error(f"❌ Ошибка получения тика для закрытия позиции по {position.symbol}")
+        return False
+    price = tick.bid if action == mt5.ORDER_TYPE_SELL else tick.ask
+
+    request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": position.symbol,
+        "volume": position.volume,
+        "type": action,
+        "position": position.ticket,
+        "price": price,
+        "deviation": 10,
+        "type_filling": mt5.ORDER_FILLING_FOK,
+        "comment": "Close by strategy",
+    }
+
+    result = mt5.order_send(request)
+
+    if result.retcode == mt5.TRADE_RETCODE_DONE:
+        file_logger.info(f"✅ Позиция по {position.symbol} закрыта успешно.")
+        return True
+    else:
+        file_logger.error(f"❌ Ошибка закрытия позиции по {position.symbol}: {result.retcode}")
+        return False
