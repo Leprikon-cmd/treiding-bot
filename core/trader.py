@@ -148,6 +148,9 @@ class Trader:
         return df['tr'].rolling(window=period).mean().iloc[-1]
 
     def _manage_trailing(self, position, atr):
+        be_mult = BREAK_EVEN_ATR.get(self.strategy_name, BREAK_EVEN_ATR)
+        trail_mult = TRAILING_ATR.get(self.strategy_name, TRAILING_ATR)
+        step_mult = TRAILING_STEP_ATR.get(self.strategy_name, TRAILING_STEP_ATR)
         ticket = position.ticket
         state = self._trailing_state.setdefault(ticket, {"be": False, "last_trail": None})
         tick = mt5.symbol_info_tick(self.symbol)
@@ -159,33 +162,43 @@ class Trader:
         # profit in price units
         profit = (current - entry) * (1 if position.type == mt5.ORDER_TYPE_BUY else -1)
         # move SL to break-even
-        if not state["be"] and profit >= BREAK_EVEN_ATR * atr:
+        if not state["be"] and profit >= be_mult * atr:
             be_price = (entry + point) if position.type == mt5.ORDER_TYPE_BUY else (entry - point)
-            request = {
+            modify_request = {
                 "action": mt5.TRADE_ACTION_SLTP,
                 "symbol": self.symbol,
                 "position": ticket,
                 "sl": be_price,
-                "tp": position.tp
+                "tp": position.tp,
+                "deviation": 10,
+                "type_filling": mt5.ORDER_FILLING_FOK
             }
-            mt5.order_send(request)
+            result_mod = mt5.order_send(modify_request)
+            if result_mod.retcode == mt5.TRADE_RETCODE_DONE:
+                print(f"🔒 {self.symbol}: SL updated #{ticket} @ {be_price:.5f}")
+            else:
+                file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {result_mod.retcode}")
             state["be"] = True
-            print(f"🔒 {self.symbol}: SL → BE #{ticket} @ {be_price:.5f}")
         # trailing stop
-        base = (TRAILING_ATR - TRAILING_STEP_ATR) * atr
+        base = (trail_mult - step_mult) * atr
         trail_price = (entry + base) if position.type == mt5.ORDER_TYPE_BUY else (entry - base)
         if state["be"] and ((position.type == mt5.ORDER_TYPE_BUY and current > trail_price) or
                             (position.type == mt5.ORDER_TYPE_SELL and current < trail_price)):
-            request = {
+            modify_request = {
                 "action": mt5.TRADE_ACTION_SLTP,
                 "symbol": self.symbol,
                 "position": ticket,
                 "sl": trail_price,
-                "tp": position.tp
+                "tp": position.tp,
+                "deviation": 10,
+                "type_filling": mt5.ORDER_FILLING_FOK
             }
-            mt5.order_send(request)
+            result_mod = mt5.order_send(modify_request)
+            if result_mod.retcode == mt5.TRADE_RETCODE_DONE:
+                print(f"↔️ {self.symbol}: трейл #{ticket} @ {trail_price:.5f}")
+            else:
+                file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {result_mod.retcode}")
             state["last_trail"] = trail_price
-            print(f"↔️ {self.symbol}: трейл #{ticket} @ {trail_price:.5f}")
 
     def check_and_close_position(self, position):
         rates = self.strategy.get_rates()
