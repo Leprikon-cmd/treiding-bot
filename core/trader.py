@@ -7,6 +7,7 @@ import csv
 from datetime import datetime
 import pandas as pd
 from config.settings import ATR_SETTINGS
+from config.settings import BREAK_EVEN_ATR, TRAILING_ATR, TRAILING_STEP_ATR
 
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
@@ -25,6 +26,8 @@ class Trader:
         self.strategy_name = self.strategy.__class__.__name__
         self.log_path = f"logs/{self.strategy_name}_{self.symbol}.csv"
         self._prepare_log()
+        # Initialize trailing/break-even state per position
+        self._trailing_state = {}
 
     def _prepare_log(self):
         os.makedirs("logs", exist_ok=True)
@@ -135,11 +138,62 @@ class Trader:
             print(f"⚠️ {self.symbol}: ошибка открытия ({signal.upper()})")
             self._log_trade("entry", price, lot, "fail")
 
+    def _compute_atr(self, rates, period):
+        df = pd.DataFrame(rates)
+        df['prev_close'] = df['close'].shift(1)
+        df['hl'] = df['high'] - df['low']
+        df['hc'] = (df['high'] - df['prev_close']).abs()
+        df['lc'] = (df['low'] - df['prev_close']).abs()
+        df['tr'] = df[['hl', 'hc', 'lc']].max(axis=1)
+        return df['tr'].rolling(window=period).mean().iloc[-1]
+
+    def _manage_trailing(self, position, atr):
+        ticket = position.ticket
+        state = self._trailing_state.setdefault(ticket, {"be": False, "last_trail": None})
+        tick = mt5.symbol_info_tick(self.symbol)
+        if not tick:
+            return
+        current = tick.ask if position.type == mt5.ORDER_TYPE_BUY else tick.bid
+        entry = position.price_open
+        point = mt5.symbol_info(self.symbol).point
+        # profit in price units
+        profit = (current - entry) * (1 if position.type == mt5.ORDER_TYPE_BUY else -1)
+        # move SL to break-even
+        if not state["be"] and profit >= BREAK_EVEN_ATR * atr:
+            be_price = (entry + point) if position.type == mt5.ORDER_TYPE_BUY else (entry - point)
+            mt5.order_modify({
+                "action": mt5.TRADE_ACTION_SLTP,
+                "symbol": self.symbol,
+                "position": ticket,
+                "sl": be_price,
+                "tp": position.tp
+            })
+            state["be"] = True
+            print(f"🔒 {self.symbol}: SL → BE #{ticket} @ {be_price:.5f}")
+        # trailing stop
+        base = (TRAILING_ATR - TRAILING_STEP_ATR) * atr
+        trail_price = (entry + base) if position.type == mt5.ORDER_TYPE_BUY else (entry - base)
+        if state["be"] and ((position.type == mt5.ORDER_TYPE_BUY and current > trail_price) or
+                            (position.type == mt5.ORDER_TYPE_SELL and current < trail_price)):
+            mt5.order_modify({
+                "action": mt5.TRADE_ACTION_SLTP,
+                "symbol": self.symbol,
+                "position": ticket,
+                "sl": trail_price,
+                "tp": position.tp
+            })
+            state["last_trail"] = trail_price
+            print(f"↔️ {self.symbol}: трейл #{ticket} @ {trail_price:.5f}")
+
     def check_and_close_position(self, position):
         rates = self.strategy.get_rates()
         if rates is None:
             print(f"⚠️ Нет данных для выхода {self.symbol}")
             return
+
+        # compute ATR and apply break-even/trailing logic
+        atr = self._compute_atr(self.strategy.get_rates(), ATR_SETTINGS[self.strategy_name]['period'])
+        self._manage_trailing(position, atr)
 
         if self.strategy.check_exit_signal(rates):
             self.close_position(position)
