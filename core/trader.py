@@ -1,8 +1,8 @@
 # Обновлённый Trader с фильтрацией символов и аккуратным логированием отказов
 
-from utils.logger import file_logger, console_logger
+from utils.logger import file_logger
 import MetaTrader5 as mt5
-from core.mt5_interface import send_order
+from core.mt5_interface import send_order, close_order
 from config.settings import MIN_STOP_POINTS, STRATEGY_ALLOCATION
 import os
 import csv
