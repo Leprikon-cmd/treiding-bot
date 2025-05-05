@@ -73,11 +73,21 @@ class Trader:
             signal = self.strategy.check_entry_signal(rates)
             if signal:
                 print(f"{emoji} {self.symbol} — ✅ {signal.upper()}")
-                self._try_open_order(signal)
+                self._try_open_order(signal, rates)
             else:
                 print(f"{emoji} {self.symbol} — ❌ ⛔")
 
-    def _try_open_order(self, signal):
+    def _try_open_order(self, signal, rates):
+        # динамический расчет SL/TP на основе ATR
+        df_atr = pd.DataFrame(rates)
+        df_atr['tr'] = df_atr['high'] - df_atr['low']
+        atr = df_atr['tr'].rolling(window=ATR_SETTINGS['period']).mean().iloc[-1]
+        symbol_info = mt5.symbol_info(self.symbol)
+        point = symbol_info.point
+        # SL/TP в пунктах
+        sl_points = (ATR_SETTINGS['sl_multiplier'] * atr) / point
+        tp_points = (ATR_SETTINGS['tp_multiplier'] * atr) / point
+
         tick = mt5.symbol_info_tick(self.symbol)
         if tick is None:
             print(f"❌ {self.symbol}: ошибка тика")
@@ -89,27 +99,8 @@ class Trader:
         allocation_percent = STRATEGY_ALLOCATION.get(self.strategy_name, 0.25)
         strategy_budget = total_equity * allocation_percent
 
-        # 📐 Рассчёт динамических SL/TP по ATR
-        rates = self.strategy.get_rates()
-        df_atr = pd.DataFrame(rates)
-        df_atr['prev_close'] = df_atr['close'].shift(1)
-        df_atr['tr'] = df_atr.apply(
-            lambda row: max(
-                row['high'] - row['low'],
-                abs(row['high'] - row['prev_close']),
-                abs(row['low'] - row['prev_close'])
-            ), axis=1
-        )
-        atr_period = ATR_SETTINGS[self.strategy_name]['period']
-        atr_value = df_atr['tr'].rolling(window=atr_period).mean().iloc[-1]
-        point = mt5.symbol_info(self.symbol).point
-        sl_mult = ATR_SETTINGS[self.strategy_name]['sl_multiplier']
-        tp_mult = ATR_SETTINGS[self.strategy_name]['tp_multiplier']
-        sl_points = max(int(round(sl_mult * atr_value / point)), 1)
-        tp_points = max(int(round(tp_mult * atr_value / point)), 1)
-        print(f"📐 {self.symbol}: ATR={atr_value:.5f}, SL_pts={sl_points}, TP_pts={tp_points}")
         lot = self.strategy.calculate_lot(price, sl_points, strategy_budget)
-        print(f"🔎 {self.symbol}: бюджет={strategy_budget:.2f}, SL={sl_points}, лот={lot}")
+        print(f"🔎 {self.symbol}: бюджет={strategy_budget:.2f}, SL={sl_points:.2f}, лот={lot}")
 
         if lot <= 0:
             print(f"⚠️ {self.symbol}: Лот некорректен")
