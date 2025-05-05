@@ -2,8 +2,8 @@ import MetaTrader5 as mt5
 
 #Бюджеты стратегий
 STRATEGY_ALLOCATION = {
-    "PriceActionMAStrategy": 0.7,   # 70% от счёта
-    "EMARSIVolumeStrategy": 0.3,    # 30% от счёта
+    "PriceActionMAStrategy": 0.3,   # 30% от счёта
+    "EMARSIVolumeStrategy": 0.7,    # 70% от счёта
 }
 
 # Валютные пары для торговли
