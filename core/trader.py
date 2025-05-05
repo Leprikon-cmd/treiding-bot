@@ -158,8 +158,9 @@ class Trader:
         point = mt5.symbol_info(self.symbol).point
         # profit in price units
         profit = (current - entry) * (1 if position.type == mt5.ORDER_TYPE_BUY else -1)
-        # move SL to break-even
-        if not state["be"] and profit >= BREAK_EVEN_ATR * atr:
+        # break-even threshold multiplier per strategy
+        be_mult = BREAK_EVEN_ATR.get(self.strategy_name, 0)
+        if not state["be"] and profit >= be_mult * atr:
             be_price = (entry + point) if position.type == mt5.ORDER_TYPE_BUY else (entry - point)
             mt5.order_modify({
                 "action": mt5.TRADE_ACTION_SLTP,
@@ -170,8 +171,10 @@ class Trader:
             })
             state["be"] = True
             print(f"🔒 {self.symbol}: SL → BE #{ticket} @ {be_price:.5f}")
-        # trailing stop
-        base = (TRAILING_ATR - TRAILING_STEP_ATR) * atr
+        # trailing stop multipliers per strategy
+        trail_mult = TRAILING_ATR.get(self.strategy_name, 0)
+        trail_step = TRAILING_STEP_ATR.get(self.strategy_name, 0)
+        base = (trail_mult - trail_step) * atr
         trail_price = (entry + base) if position.type == mt5.ORDER_TYPE_BUY else (entry - base)
         if state["be"] and ((position.type == mt5.ORDER_TYPE_BUY and current > trail_price) or
                             (position.type == mt5.ORDER_TYPE_SELL and current < trail_price)):
