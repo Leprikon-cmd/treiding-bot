@@ -1,5 +1,3 @@
-import MetaTrader5 as mt5
-
 #Бюджеты стратегий
 STRATEGY_ALLOCATION = {
     "PriceActionMAStrategy": 0.2,   # 20% от счёта
@@ -27,16 +25,10 @@ LOT = 0.01
 
 # ATR-based dynamic SL/TP settings per strategy
 ATR_SETTINGS = {
-    "PriceActionMAStrategy": {
-        "period": 14,
-        "sl_multiplier": 1.5,
-        "tp_multiplier": 2.0
-    },
-    "EMARSIVolumeStrategy": {
-        "period": 14,
-        "sl_multiplier": 2.0,
-        "tp_multiplier": 3.0
-    }
+    "PriceActionMAStrategy":    { "period":14, "sl_multiplier":1.5, "tp_multiplier":2.0 },
+    "EMARSIVolumeStrategy":     { "period":14, "sl_multiplier":2.0, "tp_multiplier":3.0 },
+    "VWAPStrategy":             { "period":14, "sl_multiplier":1.5, "tp_multiplier":2.5 },
+    "CCIDivergenceStrategy":    { "period":14, "sl_multiplier":1.0, "tp_multiplier":1.5 },
 }
 
 # Минимальные безопасные стопы в пунктах по каждой валютной паре
@@ -66,3 +58,25 @@ RUB_SYMBOLS = [
     "EURRUBrfd",
     "CNYRUBrfd",
 ]
+
+# ATR-based break-even and trailing stop settings per strategy
+BREAK_EVEN_ATR = {
+    "PriceActionMAStrategy": 1.0,
+    "EMARSIVolumeStrategy": 1.0,
+    "VWAPStrategy": 1.0,
+    "CCIDivergenceStrategy": 1.0,
+}
+
+TRAILING_ATR = {
+    "PriceActionMAStrategy": 1.5,
+    "EMARSIVolumeStrategy": 2.0,
+    "VWAPStrategy": 1.5,
+    "CCIDivergenceStrategy": 1.5,
+}
+
+TRAILING_STEP_ATR = {
+    "PriceActionMAStrategy": 0.5,
+    "EMARSIVolumeStrategy": 0.5,
+    "VWAPStrategy": 0.5,
+    "CCIDivergenceStrategy": 0.5,
+}
