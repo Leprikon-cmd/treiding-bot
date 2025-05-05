@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import MetaTrader5 as mt5 # игнорировать проверку типов
 from utils.risk import calculate_raw_lot, adjust_lot, max_affordable_lot
-from config.settings import DEFAULT_RISK_PERCENT
+from config.settings import RISK_PER_TRADE
 
 class StrategyBase(ABC):
     def __init__(self, symbol, lot, tp=50, sl=0):
