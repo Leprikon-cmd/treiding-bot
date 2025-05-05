@@ -30,7 +30,7 @@ python main.py
 ## 🛠️ В разработке
 - Отчётность и графики
 - Управление из UI
-
+- проверка связи
 ---
 
 📫 Поддержка: [https://github.com/Leprikon-cmd/treiding-bot](https://github.com/Leprikon-cmd/treiding-bot)
