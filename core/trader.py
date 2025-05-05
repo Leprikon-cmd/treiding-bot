@@ -6,7 +6,7 @@ import os
 import csv
 from datetime import datetime
 import pandas as pd
-from config.settings import ATR_SETTINGS
+from config.settings import ATR_SETTINGS, RISK_PER_TRADE, MIN_LOT, MAX_LOT
 from config.settings import BREAK_EVEN_ATR, TRAILING_ATR, TRAILING_STEP_ATR
 
 STRATEGY_ICONS = {
@@ -109,11 +109,15 @@ class Trader:
         price = tick.ask if signal == 'buy' else tick.bid
         account_info = mt5.account_info()
         total_equity = account_info.equity if account_info else 40000
-        allocation_percent = STRATEGY_ALLOCATION.get(self.strategy_name, 0.25)
-        strategy_budget = total_equity * allocation_percent
+        # Calculate risk amount based on configured percentage
+        risk_amount = total_equity * RISK_PER_TRADE
 
-        lot = self.strategy.calculate_lot(price, sl_points, strategy_budget)
-        print(f"🔎 {self.symbol}: бюджет={strategy_budget:.2f}, SL={sl_points:.2f}, лот={lot}")
+        # Determine lot size from risk amount and stop-loss
+        lot = self.strategy.calculate_lot(price, sl_points, risk_amount)
+        # Clamp lot within allowed bounds
+        lot = max(MIN_LOT, min(lot, MAX_LOT))
+
+        print(f"🔎 {self.symbol}: риск={risk_amount:.2f}, SL={sl_points:.2f}, лот={lot}")
 
         if lot <= 0:
             print(f"⚠️ {self.symbol}: Лот некорректен")

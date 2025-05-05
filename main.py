@@ -1,4 +1,4 @@
-from config.settings import SYMBOLS, LOT
+from config.settings import SYMBOLS, MIN_LOT
 from core.mt5_wrapper import initialize_mt5, shutdown_mt5
 from strategies.CCI import CCIDivergenceStrategy
 from strategies.VWAP import VWAPStrategy
@@ -28,7 +28,7 @@ active_strategies = [
 strategies = []
 for StrategyClass in active_strategies:
     for symbol in SYMBOLS:
-        strategy = StrategyClass(symbol, LOT)
+        strategy = StrategyClass(symbol, MIN_LOT)
         strategies.append(strategy)
 
 # 🔥 Правильное создание трейдеров
