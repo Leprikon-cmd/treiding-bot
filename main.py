@@ -1,5 +1,6 @@
 from config.settings import SYMBOLS, LOT
 from core.mt5_wrapper import initialize_mt5, shutdown_mt5
+from strategies.CCI import CCIDivergenceStrategy
 from strategies.VWAP import VWAPStrategy
 from strategies.ema_cross import EMARSIVolumeStrategy
 from strategies.price_action_ma import PriceActionMAStrategy
@@ -19,7 +20,8 @@ print("\u2705 Успешное подключение к MetaTrader 5.")
 active_strategies = [
      EMARSIVolumeStrategy,
      PriceActionMAStrategy,
-     VWAPStrategy
+     VWAPStrategy,
+     CCIDivergenceStrategy
 ]
 
 # 📈 Инициализация стратегий и трейдеров

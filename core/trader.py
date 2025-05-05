@@ -11,7 +11,8 @@ from config.settings import ATR_SETTINGS
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
     "PriceActionMAStrategy": "⚡",
-    "VWAPStrategy": "📊"
+    "VWAPStrategy": "📊",
+    "CCIDivergenceStrategy": "💸",
 }
 
 def log_cycle_header():
