@@ -39,3 +39,8 @@ build/
 *.swp
 *.bak
 *.tmp
+config/__pycache__/settings.cpython-313.pyc
+config/__pycache__/settings.cpython-313.pyc
+core/__pycache__/mt5_interface.cpython-313.pyc
+logs/PriceActionMAStrategy_USDJPYrfd.csv
+strategies/__pycache__/ema_cross.cpython-313.pyc
