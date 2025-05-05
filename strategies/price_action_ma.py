@@ -17,6 +17,14 @@ class PriceActionMAStrategy(StrategyBase):
     def _calculate_indicators(self, df):
         df['ma'] = df['close'].rolling(window=self.ma_period).mean()
         df['adx'] = self._calculate_adx(df)
+        # True Range for ATR
+        df['tr'] = df[['high','low','close']].apply(
+            lambda r: max(
+                r['high'] - r['low'],
+                abs(r['high'] - r['close'].shift(1).fillna(r['close'])),
+                abs(r['low']  - r['close'].shift(1).fillna(r['close']))
+            ), axis=1
+        )
         return df
 
     def _is_bullish_engulfing(self, df):

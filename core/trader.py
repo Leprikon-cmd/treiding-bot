@@ -7,6 +7,8 @@ from config.settings import MIN_STOP_POINTS, STRATEGY_ALLOCATION
 import os
 import csv
 from datetime import datetime
+import pandas as pd
+from config.settings import ATR_SETTINGS
 
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
@@ -87,8 +89,27 @@ class Trader:
         allocation_percent = STRATEGY_ALLOCATION.get(self.strategy_name, 0.25)
         strategy_budget = total_equity * allocation_percent
 
-        lot = self.strategy.calculate_lot(price, self.sl, strategy_budget)
-        print(f"🔎 {self.symbol}: бюджет={strategy_budget:.2f}, SL={self.sl}, лот={lot}")
+        # 📐 Рассчёт динамических SL/TP по ATR
+        rates = self.strategy.get_rates()
+        df_atr = pd.DataFrame(rates)
+        df_atr['prev_close'] = df_atr['close'].shift(1)
+        df_atr['tr'] = df_atr.apply(
+            lambda row: max(
+                row['high'] - row['low'],
+                abs(row['high'] - row['prev_close']),
+                abs(row['low'] - row['prev_close'])
+            ), axis=1
+        )
+        atr_period = ATR_SETTINGS[self.strategy_name]['period']
+        atr_value = df_atr['tr'].rolling(window=atr_period).mean().iloc[-1]
+        point = mt5.symbol_info(self.symbol).point
+        sl_mult = ATR_SETTINGS[self.strategy_name]['sl_multiplier']
+        tp_mult = ATR_SETTINGS[self.strategy_name]['tp_multiplier']
+        sl_points = max(int(round(sl_mult * atr_value / point)), 1)
+        tp_points = max(int(round(tp_mult * atr_value / point)), 1)
+        print(f"📐 {self.symbol}: ATR={atr_value:.5f}, SL_pts={sl_points}, TP_pts={tp_points}")
+        lot = self.strategy.calculate_lot(price, sl_points, strategy_budget)
+        print(f"🔎 {self.symbol}: бюджет={strategy_budget:.2f}, SL={sl_points}, лот={lot}")
 
         if lot <= 0:
             print(f"⚠️ {self.symbol}: Лот некорректен")
@@ -101,8 +122,8 @@ class Trader:
             lot,
             mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
             price,
-            sl_points=self.sl,
-            tp_points=self.tp,
+            sl_points=sl_points,
+            tp_points=tp_points,
             comment=f"{self.strategy_name}_entry"
         )
 

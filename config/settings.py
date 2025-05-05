@@ -23,6 +23,20 @@ SYMBOLS = [
 # Лот по умолчанию
 LOT = 0.01
 
+# ATR-based dynamic SL/TP settings per strategy
+ATR_SETTINGS = {
+    "PriceActionMAStrategy": {
+        "period": 14,
+        "sl_multiplier": 1.5,
+        "tp_multiplier": 2.0
+    },
+    "EMARSIVolumeStrategy": {
+        "period": 14,
+        "sl_multiplier": 2.0,
+        "tp_multiplier": 3.0
+    }
+}
+
 # Минимальные безопасные стопы в пунктах по каждой валютной паре
 MIN_STOP_POINTS = {
     "EURUSDrfd": 15,
