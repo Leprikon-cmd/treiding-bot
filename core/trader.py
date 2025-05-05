@@ -148,7 +148,7 @@ class Trader:
         return df['tr'].rolling(window=period).mean().iloc[-1]
 
     def _manage_trailing(self, position, atr):
-        be_mult = BREAK_EVEN_ATR.get(self.strategy_name, BREAK_EVEN_ATR)
+        be_mult = BREAK_EEN_ATR.get(self.strategy_name, BREAK_EVEN_ATR)
         trail_mult = TRAILING_ATR.get(self.strategy_name, TRAILING_ATR)
         step_mult = TRAILING_STEP_ATR.get(self.strategy_name, TRAILING_STEP_ATR)
         ticket = position.ticket
