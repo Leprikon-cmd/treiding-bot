@@ -11,7 +11,7 @@ from config.settings import ATR_SETTINGS
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
     "PriceActionMAStrategy": "⚡",
-    "VWAPStrategy": "+"
+    "VWAPStrategy": "📊"
 }
 
 def log_cycle_header():
@@ -38,7 +38,6 @@ class Trader:
             writer.writerow([datetime.now().isoformat(), action, self.symbol, price, lot, result])
 
     def run(self):
-        log_cycle_header()
         emoji = STRATEGY_ICONS.get(self.strategy_name, "📈")
 
         rates = self.strategy.get_rates()
