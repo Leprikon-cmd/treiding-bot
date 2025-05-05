@@ -1,7 +1,7 @@
 from utils.logger import file_logger
 import MetaTrader5 as mt5
 from core.mt5_interface import send_order, close_order
-from config.settings import MIN_STOP_POINTS, STRATEGY_ALLOCATION
+from config.settings import STRATEGY_ALLOCATION
 import os
 import csv
 from datetime import datetime
@@ -10,7 +10,8 @@ from config.settings import ATR_SETTINGS
 
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
-    "PriceActionMAStrategy": "⚡"
+    "PriceActionMAStrategy": "⚡",
+    "VWAPStrategy": "+"
 }
 
 def log_cycle_header():
@@ -21,8 +22,6 @@ class Trader:
         self.symbol = symbol
         self.strategy = strategy
         self.strategy_name = self.strategy.__class__.__name__
-        self.tp = MIN_STOP_POINTS.get(symbol, 20)
-        self.sl = MIN_STOP_POINTS.get(symbol, 20)
         self.log_path = f"logs/{self.strategy_name}_{self.symbol}.csv"
         self._prepare_log()
 
@@ -39,6 +38,7 @@ class Trader:
             writer.writerow([datetime.now().isoformat(), action, self.symbol, price, lot, result])
 
     def run(self):
+        log_cycle_header()
         emoji = STRATEGY_ICONS.get(self.strategy_name, "📈")
 
         rates = self.strategy.get_rates()
@@ -78,7 +78,12 @@ class Trader:
     def _try_open_order(self, signal, rates):
         # динамический расчет SL/TP на основе ATR (настройки для каждой стратегии)
         df_atr = pd.DataFrame(rates)
-        df_atr['tr'] = df_atr['high'] - df_atr['low']
+        df_atr['prev_close'] = df_atr['close'].shift(1)
+        df_atr['hl'] = df_atr['high'] - df_atr['low']
+        df_atr['hc'] = (df_atr['high'] - df_atr['prev_close']).abs()
+        df_atr['lc'] = (df_atr['low'] - df_atr['prev_close']).abs()
+        df_atr['tr'] = df_atr[['hl', 'hc', 'lc']].max(axis=1)
+        df_atr.drop(columns=['prev_close','hl','hc','lc'], inplace=True)
         strategy_atr = ATR_SETTINGS.get(self.strategy_name, {})
         period = strategy_atr.get('period', 14)
         sl_multiplier = strategy_atr.get('sl_multiplier', 1.5)
@@ -91,6 +96,7 @@ class Trader:
         # SL/TP в пунктах (расчёт через ATR)
         sl_points = (sl_multiplier * atr) / point
         tp_points = (tp_multiplier * atr) / point
+        print(f"ATR={atr:.5f}, SL_pts={sl_points:.2f}, TP_pts={tp_points:.2f}")
 
         tick = mt5.symbol_info_tick(self.symbol)
         if tick is None:
