@@ -107,13 +107,17 @@ class Trader:
             return
 
         price = tick.ask if signal == 'buy' else tick.bid
+        # рассчитываем цену стоп-лосса в валютных единицах
+        sl_price = price - sl_points * point if signal == 'buy' else price + sl_points * point
         account_info = mt5.account_info()
         total_equity = account_info.equity if account_info else 40000
         # Calculate risk amount based on configured percentage
         risk_amount = total_equity * RISK_PER_TRADE
 
+        symbol_info = mt5.symbol_info(self.symbol)
+
         # Determine lot size from risk amount and stop-loss
-        lot = self.strategy.calculate_lot(price, sl_points, risk_amount)
+        lot = self.strategy.calculate_lot(symbol_info, price, sl_price)
         # Clamp lot within allowed bounds
         lot = max(MIN_LOT, min(lot, MAX_LOT))
 
