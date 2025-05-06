@@ -61,7 +61,7 @@ class EMARSIVolumeStrategy(StrategyBase):
             return "buy"
 
         if ema_cross_down and volume_ok and rsi_sell_zone:
-            return "sell"
+         return "sell"
 
         print(f"[{self.symbol}] no signal | ema_fast: {last['ema_fast']:.5f}, ema_slow: {last['ema_slow']:.5f}, rsi: {last['rsi']:.2f}, volume: {last['tick_volume']}, avg_volume: {last['volume_avg']:.2f}")
         return None
@@ -78,9 +78,6 @@ class EMARSIVolumeStrategy(StrategyBase):
             return False
 
         price = mt5.symbol_info_tick(self.symbol).ask if action == "buy" else mt5.symbol_info_tick(self.symbol).bid
-        # calculate stop-loss and take-profit prices
-        sl_price = price - self.sl if action == "buy" else price + self.sl
-        tp_price = price + self.tp if action == "buy" else price - self.tp
         deviation = 20
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
@@ -88,8 +85,6 @@ class EMARSIVolumeStrategy(StrategyBase):
             "volume": self.lot,
             "type": mt5.ORDER_TYPE_BUY if action == "buy" else mt5.ORDER_TYPE_SELL,
             "price": price,
-            "sl": sl_price,
-            "tp": tp_price,
             "deviation": deviation,
             "magic": 234000,
             "comment": "ema_cross_strategy",
