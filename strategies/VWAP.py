@@ -21,10 +21,12 @@ class VWAPStrategy(StrategyBase):
         return mt5.TIMEFRAME_M5
 
     def get_rates(self):
-        # fetch enough bars to calculate VWAP
-        count = 200
-        rates = mt5.copy_rates_from_pos(self.symbol, self.timeframe, 0, count)
-        return rates if rates is not None and len(rates) > 2 else None
+        # берём таймфрейм из метода стратегии
+        timeframe = self.get_timeframe()
+        # запрашиваем 100 баров нужного TF
+        rates = mt5.copy_rates_from_pos(self.symbol, timeframe, 0, 100)
+        # если не получилось или недостаточно данных — возвращаем None
+        return rates if rates is not None and len(rates) >= self.ma_period + 2 else None
 
     def _calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         # Typical price
