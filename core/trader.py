@@ -8,6 +8,8 @@ from datetime import datetime
 import pandas as pd
 from config.settings import ATR_SETTINGS, RISK_PER_TRADE, MIN_LOT, MAX_LOT
 from config.settings import BREAK_EVEN_ATR, TRAILING_ATR, TRAILING_STEP_ATR
+from config.settings import MAX_POSITIONS_PER_SYMBOL, DAILY_RISK_LIMIT, MAX_CONSECUTIVE_LOSSES, MIN_FREE_MARGIN_RATIO, MIN_ENTRY_INTERVAL_SEC
+from datetime import datetime, timedelta
 
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
@@ -26,6 +28,10 @@ class Trader:
         self.strategy_name = self.strategy.__class__.__name__
         self.log_path = f"logs/{self.strategy_name}_{self.symbol}.csv"
         self._prepare_log()
+        # session risk tracking
+        self.daily_pnl = 0.0
+        self.consec_losses = 0
+        self.last_entry_time = None
         # Initialize trailing/break-even state per position
         self._trailing_state = {}
 
@@ -79,6 +85,34 @@ class Trader:
                 print(f"{emoji} {self.symbol} — ❌ ⛔")
 
     def _try_open_order(self, signal, rates):
+        # Entry interval guard
+        now = datetime.now()
+        if self.last_entry_time and (now - self.last_entry_time).total_seconds() < MIN_ENTRY_INTERVAL_SEC:
+            print(f"⚠️ {self.symbol}: слишком частые входы, жди {MIN_ENTRY_INTERVAL_SEC} сек")
+            return
+
+        # Free margin guard
+        account = mt5.account_info()
+        if account and account.margin_free / account.balance < MIN_FREE_MARGIN_RATIO:
+            print(f"⚠️ {self.symbol}: свободная маржа < {MIN_FREE_MARGIN_RATIO*100:.0f}%, входы приостановлены")
+            return
+
+        # Max positions per symbol guard
+        positions = mt5.positions_get(symbol=self.symbol) or []
+        if len(positions) >= MAX_POSITIONS_PER_SYMBOL:
+            print(f"⚠️ {self.symbol}: уже открыто {len(positions)} позиций, максимум {MAX_POSITIONS_PER_SYMBOL}")
+            return
+
+        # Daily loss guard
+        if account and self.daily_pnl < -DAILY_RISK_LIMIT * account.balance:
+            print(f"⚠️ {self.symbol}: дневной убыток превысил {DAILY_RISK_LIMIT*100:.0f}% депо")
+            return
+
+        # Consecutive losses guard
+        if self.consec_losses >= MAX_CONSECUTIVE_LOSSES:
+            print(f"⚠️ {self.symbol}: подряд {self.consec_losses} убыточных сделок, входы заблокированы")
+            return
+
         # динамический расчет SL/TP на основе ATR (настройки для каждой стратегии)
         df_atr = pd.DataFrame(rates)
         df_atr['prev_close'] = df_atr['close'].shift(1)
@@ -142,6 +176,7 @@ class Trader:
         if result:
             print(f"✅ {self.symbol}: {signal.upper()} открыто (lot {lot})")
             self._log_trade("entry", price, lot, "success")
+            self.last_entry_time = now
         else:
             print(f"⚠️ {self.symbol}: ошибка открытия ({signal.upper()})")
             self._log_trade("entry", price, lot, "fail")

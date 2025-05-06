@@ -19,6 +19,13 @@ STRATEGY_ALLOCATION = {
     "CCIDivergenceStrategy": 0.2,     # 20% от счёта
 }
 
+# Trader-specific
+MAX_POSITIONS_PER_SYMBOL = 1           # или 2, если стратегии умеют усредняться
+DAILY_RISK_LIMIT = 0.03                # 3% депо в убытках → стоп
+MAX_CONSECUTIVE_LOSSES = 3
+MIN_FREE_MARGIN_RATIO = 0.05           # не открывать, если свободная маржа < 5%
+MIN_ENTRY_INTERVAL_SEC = 300           # не чаще раза в 5 минут
+
 # Валютные пары для торговли
 SYMBOLS = [
     "EURUSDrfd",
