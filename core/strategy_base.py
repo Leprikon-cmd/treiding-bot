@@ -9,38 +9,6 @@ class StrategyBase(ABC):
         self.lot = lot
         self.tp = tp
         self.sl = sl
-
-    # get_timeframe and get_rates removed; see below for abstract get_rates
-
-    def calculate_lot(self, price, sl_points, budget, risk_percent=0.02):
-        sl_distance = sl_points * price * 0.0001
-        if sl_distance <= 0:
-            return 0.01
-
-        risk_rub = budget * risk_percent
-        raw_lot = risk_rub / sl_distance
-        raw_lot = max(0.01, raw_lot)
-
-        account_info = mt5.account_info()
-        if not account_info:
-            return round(min(raw_lot, 0.5), 2)
-
-        # Проверка: какой максимум реально доступен
-        max_lot = raw_lot
-        while max_lot >= 0.01:
-            margin = mt5.order_calc_margin(
-                mt5.TRADE_ACTION_DEAL,
-                self.symbol,
-                mt5.ORDER_TYPE_BUY,
-                max_lot,
-                price
-            )
-            if margin is None or margin > account_info.margin_free:
-                max_lot -= 0.01
-            else:
-                break
-
-        return round(max(max_lot, 0.01), 2)
     
     def check_entry_signal(self):
         pass
@@ -61,7 +29,7 @@ class StrategyBase(ABC):
         # получаем текущий баланс
         balance = mt5.account_info().balance
         # сумма риска на одну сделку
-        risk_amount = balance * DEFAULT_RISK_PERCENT
+        risk_amount = balance * RISK_PER_TRADE
         # первоначальный лот на основе суммы риска и дистанции до SL
         raw_lot = calculate_raw_lot(
             risk_amount,
