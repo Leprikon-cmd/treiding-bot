@@ -12,6 +12,7 @@ class VWAPStrategy(StrategyBase):
     def __init__(self, symbol, lot, deviation_points: float = 10.0):
         super().__init__(symbol, lot)
         self.deviation_points = deviation_points
+        self.ma_period = 2
         # point size for this symbol
         info = mt5.symbol_info(symbol)
         self.point = info.point if info else 0.0
