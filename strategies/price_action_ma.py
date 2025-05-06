@@ -15,9 +15,6 @@ class PriceActionMAStrategy(StrategyBase):
         # если не получилось или недостаточно данных — возвращаем None
         return rates if rates is not None and len(rates) >= self.ma_period + 2 else None
 
-    def get_rates(self):
-        rates = mt5.copy_rates_from_pos(self.symbol, self.timeframe, 0, 100)
-        return rates if rates is not None and len(rates) >= self.ma_period + 2 else None
 
     def _calculate_indicators(self, df):
         # Скользящая средняя
