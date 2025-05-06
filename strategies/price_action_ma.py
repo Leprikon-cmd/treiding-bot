@@ -7,6 +7,12 @@ class PriceActionMAStrategy(StrategyBase):
         self.ma_period = ma_period
         super().__init__(symbol, lot)
 
+    def get_timeframe(self):
+        """
+        Return the timeframe for PriceActionMA strategy.
+        """
+        return mt5.TIMEFRAME_M5  # 5-minute timeframe
+
     def get_rates(self):
         # берём таймфрейм из метода стратегии
         timeframe = self.get_timeframe()
@@ -14,7 +20,6 @@ class PriceActionMAStrategy(StrategyBase):
         rates = mt5.copy_rates_from_pos(self.symbol, timeframe, 0, 100)
         # если не получилось или недостаточно данных — возвращаем None
         return rates if rates is not None and len(rates) >= self.ma_period + 2 else None
-
 
     def _calculate_indicators(self, df):
         # Скользящая средняя
