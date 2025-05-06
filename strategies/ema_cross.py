@@ -16,7 +16,8 @@ class EMARSIVolumeStrategy(StrategyBase):
         return mt5.TIMEFRAME_H1  # ⏱ среднесрок
 
     def get_rates(self):
-        rates = mt5.copy_rates_from_pos(self.symbol, self.timeframe, 0, 200)
+        timeframe = self.get_timeframe()
+        rates = mt5.copy_rates_from_pos(self.symbol, timeframe, 0, 200)
         if rates is None or len(rates) < max(self.ema_slow, self.rsi_period, 20) + 1:
             return None
         return rates
