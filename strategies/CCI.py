@@ -20,7 +20,7 @@ class CCIDivergenceStrategy(StrategyBase):
         # запрашиваем 100 баров нужного TF
         rates = mt5.copy_rates_from_pos(self.symbol, timeframe, 0, 100)
         # если не получилось или недостаточно данных — возвращаем None
-        return rates if rates is not None and len(rates) >= self.ma_period + 2 else None
+        return rates if rates is not None and len(rates) >= self.period + 2 else None
 
     def _calculate_indicators(self, df):
         # Typical price
