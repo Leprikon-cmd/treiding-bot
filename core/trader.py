@@ -147,7 +147,7 @@ class Trader:
         total_equity = account_info.equity if account_info else 40000
         # Calculate risk amount based on configured percentage
         risk_amount = total_equity * RISK_PER_TRADE
-
+        
         symbol_info = mt5.symbol_info(self.symbol)
 
         # Determine lot size from risk amount and stop-loss

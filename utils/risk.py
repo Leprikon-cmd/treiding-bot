@@ -1,7 +1,7 @@
-
-
 import math
 import MetaTrader5 as mt5
+if not mt5.initialize():
+    raise RuntimeError("Не удалось инициализировать MT5")
 
 def calculate_raw_lot(risk_rub: float, sl_price: float, price: float, contract_size: float, point: float) -> float:
     """
