@@ -1,22 +1,48 @@
-
-from core.mt5_broker import Mt5Broker
+from config.settings import SYMBOLS, MIN_LOT
+from core.mt5_wrapper import initialize_mt5, shutdown_mt5
+from strategies.CCI import CCIDivergenceStrategy
+from strategies.VWAP import VWAPStrategy
+from strategies.ema_cross import EMARSIVolumeStrategy
+from strategies.price_action_ma import PriceActionMAStrategy
 from core.trader import Trader
-from core.strategy_manager import get_strategy
+import time
 
-def main():
-    symbol = "EURUSD"
-    timeframe = "M5"
-    strategy_name = "ema_cross"
+print("\U0001F680 Запуск трейдинг-бота...")
 
-    broker = Mt5Broker()
-    strategy = get_strategy(strategy_name)
-    trader = Trader(symbol=symbol, strategy=strategy, broker=broker)
+# ⚙️ Подключение к MetaTrader 5
+if not initialize_mt5():
+    print("\u274C Ошибка подключения к MetaTrader 5. Завершение.")
+    exit()
 
-    # Пример: загрузка истории и попытка входа
-    rates = broker.copy_rates(symbol, getattr(broker, "TIMEFRAME_" + timeframe), 0, 100)
-    trader._try_open_order(rates)
+print("\u2705 Успешное подключение к MetaTrader 5.")
 
-    broker.shutdown()
+# 📈 Выбор активных стратегий
+active_strategies = [
+     EMARSIVolumeStrategy,
+     PriceActionMAStrategy,
+     VWAPStrategy,
+     CCIDivergenceStrategy
+]
 
-if __name__ == "__main__":
-    main()
+# 📈 Инициализация стратегий и трейдеров
+strategies = []
+for StrategyClass in active_strategies:
+    for symbol in SYMBOLS:
+        strategy = StrategyClass(symbol, MIN_LOT)
+        strategies.append(strategy)
+
+# 🔥 Правильное создание трейдеров
+traders = [Trader(strategy.symbol, strategy) for strategy in strategies]
+
+# 🔁 Основной цикл обработки
+try:
+    while True:
+        print(f"\n\U0001F501 Новый цикл обработки: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        for trader in traders:
+            trader.run()
+        time.sleep(10)
+except KeyboardInterrupt:
+    print("\n\U0001F6D1 Остановка по запросу пользователя.")
+finally:
+    shutdown_mt5()
+    print("\U0001F4F4 MetaTrader 5 отключён. Бот завершил работу.")
