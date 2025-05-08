@@ -91,10 +91,20 @@ class Trader:
             print(f"⚠️ {self.symbol}: слишком частые входы, жди {MIN_ENTRY_INTERVAL_SEC} сек")
             return
 
-        # Free margin guard
         account = mt5.account_info()
-        if account and account.margin_free / account.balance < MIN_FREE_MARGIN_RATIO:
-            print(f"⚠️ {self.symbol}: свободная маржа < {MIN_FREE_MARGIN_RATIO*100:.0f}%, входы приостановлены")
+        full_equity = account.equity if account else 40000
+        allocation = STRATEGY_ALLOCATION.get(self.strategy_name, 1.0)  # например, 0.2 для 20%
+        allocated_equity = full_equity * allocation
+        file_logger.info(
+            f"{self.symbol}: total_equity={full_equity:.2f}, allocation={allocation*100:.0f}%, "
+            f"allocated_equity={allocated_equity:.2f}"
+            )
+
+        # до того, как мы рассчитываем лот
+        if account and account.margin_free < allocated_equity * MIN_FREE_MARGIN_RATIO:
+            file_logger.warning(
+                f"{self.symbol}: свободная маржа ({account.margin_free:.2f}) "
+                f"< {MIN_FREE_MARGIN_RATIO*100:.0f}% выделенного капитала ({allocated_equity:.2f}), входы приостановлены")
             return
 
         # Max positions per symbol guard
