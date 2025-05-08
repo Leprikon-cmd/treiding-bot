@@ -187,17 +187,17 @@ class Trader:
 
         # Hard cap: max 3% of allocated equity used for margin per trade
         max_margin_per_trade = allocated_equity * 0.03
-        # Estimate margin per lot step
         volume_step = symbol_info.volume_step
-        test_lot = volume_step
-        margin_per_lot = mt5.order_calc_margin(
+
+        # Estimate margin required for 1.0 lot
+        margin_for_one_lot = mt5.order_calc_margin(
             mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
-            self.symbol, test_lot, price
+            self.symbol, 1.0, price
         )
-        if margin_per_lot is None:
-            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу за шаг лота {test_lot}")
+        if margin_for_one_lot is None:
+            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу для 1.0 лота")
         else:
-            max_lot_by_margin = math.floor(max_margin_per_trade / margin_per_lot / volume_step) * volume_step
+            max_lot_by_margin = math.floor(max_margin_per_trade / margin_for_one_lot / volume_step) * volume_step
             if max_lot_by_margin < MIN_LOT:
                 print(f"⚠️ {self.symbol}: недостаточно маржи для минимального лота после ограничения маржи")
                 return
