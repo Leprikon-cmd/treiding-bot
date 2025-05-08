@@ -186,7 +186,7 @@ class Trader:
         file_logger.info(f"Стратегия {self.strategy_name}: lot после clamp [{MIN_LOT}, {MAX_LOT}] = {lot:.2f}")
 
         # Hard cap: max 3% of allocated equity used for margin per trade
-        max_margin_per_trade = allocated_equity * 0.03
+        max_margin_per_trade = allocated_equity * 0.1
         volume_step = symbol_info.volume_step
 
         # Estimate margin required for 1.0 lot
