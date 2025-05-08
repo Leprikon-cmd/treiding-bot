@@ -78,7 +78,16 @@ class Trader:
             print(f"{emoji} {self.symbol} — 🟢 позиция открыта")
             self.check_and_close_position(current_position)
         else:
+            # Debug: log strategy entry check details
+            file_logger.info(f"{self.symbol}: проверка входного сигнала ({self.strategy_name}) на {len(rates)} баров, последний close={rates[-1]['close']}")
+            print(f"DEBUG {self.symbol}: running check_entry_signal for last close={rates[-1]['close']}")
+            # Print last 5 bars for debugging
+            last_bars = rates[-5:]
+            print(f"DEBUG {self.symbol}: последние 5 баров (time, close): " +
+                  ", ".join(f"({datetime.fromtimestamp(b['time']).strftime('%H:%M')}, {b['close']:.5f})" for b in last_bars))
             signal = self.strategy.check_entry_signal(rates)
+            file_logger.info(f"{self.symbol}: check_entry_signal returned '{signal}'")
+            print(f"DEBUG {self.symbol}: сигнал входа = {signal}")
             if signal:
                 print(f"{emoji} {self.symbol} — ✅ {signal.upper()}")
                 self._try_open_order(signal, rates)
@@ -185,8 +194,8 @@ class Trader:
         lot = max(MIN_LOT, min(raw_lot, MAX_LOT))
         file_logger.info(f"Стратегия {self.strategy_name}: lot после clamp [{MIN_LOT}, {MAX_LOT}] = {lot:.2f}")
 
-        # Hard cap: max 3% of allocated equity used for margin per trade
-        max_margin_per_trade = allocated_equity * 0.1
+        # Hard cap: max 10% of allocated equity used for margin per trade
+        max_margin_per_trade = allocated_equity * 0.10
         volume_step = symbol_info.volume_step
 
         # Estimate margin required for 1.0 lot
