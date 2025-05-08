@@ -126,7 +126,8 @@ class Trader:
 
         # Multi-TF filter: require H4 trend alignment
         rates_h4 = mt5.copy_rates_from(self.symbol, mt5.TIMEFRAME_H4, datetime.now(), 100)
-        if rates_h4:
+        if rates_h4 is not None and len(rates_h4) > 0:
+    
             df_h4 = pd.DataFrame(rates_h4)
             sma_short = df_h4['close'].rolling(window=10).mean().iloc[-1]
             sma_long = df_h4['close'].rolling(window=50).mean().iloc[-1]
