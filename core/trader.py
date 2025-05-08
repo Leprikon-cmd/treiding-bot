@@ -191,57 +191,82 @@ class Trader:
         return df['tr'].rolling(window=period).mean().iloc[-1]
 
     def _manage_trailing(self, position, atr):
-        be_mult = BREAK_EVEN_ATR.get(self.strategy_name, BREAK_EVEN_ATR)
-        trail_mult = TRAILING_ATR.get(self.strategy_name, TRAILING_ATR)
-        step_mult = TRAILING_STEP_ATR.get(self.strategy_name, TRAILING_STEP_ATR)
+        """
+        Manage break-even and trailing stop-loss adjustments.
+        Break-even and trailing levels are recalculated from the current market price,
+        enforcing minimal stop distance and treating CODE 10025 (NO_CHANGES) as success.
+        """
+        # Retrieve symbol parameters and current market tick
+        symbol_info = mt5.symbol_info(self.symbol)
+        tick = mt5.symbol_info_tick(self.symbol)
+        if not symbol_info or not tick:
+            return
+
+        point = symbol_info.point
+        stop_level = symbol_info.trade_stops_level
+        min_dist = stop_level * point
+
+        is_buy = position.type == mt5.ORDER_TYPE_BUY
+        # For SL calculations, buy uses bid, sell uses ask
+        price_for_sl = tick.bid if is_buy else tick.ask
+
+        entry_price = position.price_open
+        current_price = price_for_sl
+        profit = (current_price - entry_price) if is_buy else (entry_price - current_price)
+
         ticket = position.ticket
         state = self._trailing_state.setdefault(ticket, {"be": False, "last_trail": None})
-        tick = mt5.symbol_info_tick(self.symbol)
-        if not tick:
-            return
-        current = tick.ask if position.type == mt5.ORDER_TYPE_BUY else tick.bid
-        entry = position.price_open
-        point = mt5.symbol_info(self.symbol).point
-        # profit in price units
-        profit = (current - entry) * (1 if position.type == mt5.ORDER_TYPE_BUY else -1)
-        # move SL to break-even
+
+        # Break-even logic
+        be_mult = BREAK_EVEN_ATR.get(self.strategy_name, BREAK_EVEN_ATR)
         if not state["be"] and profit >= be_mult * atr:
-            be_price = (entry + point) if position.type == mt5.ORDER_TYPE_BUY else (entry - point)
-            modify_request = {
-                "action": mt5.TRADE_ACTION_SLTP,
-                "symbol": self.symbol,
-                "position": ticket,
-                "sl": be_price,
-                "tp": position.tp,
-                "deviation": 10,
-                "type_filling": mt5.ORDER_FILLING_FOK
-            }
-            result_mod = mt5.order_send(modify_request)
-            if result_mod.retcode == mt5.TRADE_RETCODE_DONE:
-                print(f"🔒 {self.symbol}: SL updated #{ticket} @ {be_price:.5f}")
-            else:
-                file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {result_mod.retcode}")
-            state["be"] = True
-        # trailing stop
-        base = (trail_mult - step_mult) * atr
-        trail_price = (entry + base) if position.type == mt5.ORDER_TYPE_BUY else (entry - base)
-        if state["be"] and ((position.type == mt5.ORDER_TYPE_BUY and current > trail_price) or
-                            (position.type == mt5.ORDER_TYPE_SELL and current < trail_price)):
-            modify_request = {
-                "action": mt5.TRADE_ACTION_SLTP,
-                "symbol": self.symbol,
-                "position": ticket,
-                "sl": trail_price,
-                "tp": position.tp,
-                "deviation": 10,
-                "type_filling": mt5.ORDER_FILLING_FOK
-            }
-            result_mod = mt5.order_send(modify_request)
-            if result_mod.retcode == mt5.TRADE_RETCODE_DONE:
-                print(f"↔️ {self.symbol}: трейл #{ticket} @ {trail_price:.5f}")
-            else:
-                file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {result_mod.retcode}")
-            state["last_trail"] = trail_price
+            # Calculate break-even price at minimal distance
+            be_price = entry_price + min_dist if is_buy else entry_price - min_dist
+            # Validate new SL: must differ sufficiently and respect minimal distance
+            if abs(be_price - price_for_sl) >= min_dist and abs(be_price - position.sl) >= point:
+                req = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "symbol": self.symbol,
+                    "position": ticket,
+                    "sl": be_price,
+                    "tp": position.tp,
+                    "deviation": 10,
+                    "type_filling": mt5.ORDER_FILLING_FOK
+                }
+                res = mt5.order_send(req)
+                # Treat NO_CHANGES (10025) as success
+                if res.retcode in (mt5.TRADE_RETCODE_DONE, mt5.TRADE_RETCODE_NO_CHANGES):
+                    print(f"🔒 {self.symbol}: SL updated #{ticket} @ {be_price:.5f}")
+                else:
+                    file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {res.retcode}")
+                state["be"] = True
+
+        # Trailing stop logic
+        trail_mult = TRAILING_ATR.get(self.strategy_name, TRAILING_ATR)
+        step_mult = TRAILING_STEP_ATR.get(self.strategy_name, TRAILING_STEP_ATR)
+        base_dist = (trail_mult - step_mult) * atr
+        trail_price = price_for_sl + base_dist if is_buy else price_for_sl - base_dist
+
+        if state["be"]:
+            # Ensure trailing SL respects minimal distance and has changed since last trail
+            if abs(trail_price - price_for_sl) >= min_dist and \
+               (state["last_trail"] is None or abs(trail_price - state["last_trail"]) >= point):
+                req = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "symbol": self.symbol,
+                    "position": ticket,
+                    "sl": trail_price,
+                    "tp": position.tp,
+                    "deviation": 10,
+                    "type_filling": mt5.ORDER_FILLING_FOK
+                }
+                res = mt5.order_send(req)
+                if res.retcode in (mt5.TRADE_RETCODE_DONE, mt5.TRADE_RETCODE_NO_CHANGES):
+                    print(f"↔️ {self.symbol}: трейл #{ticket} @ {trail_price:.5f}")
+                else:
+                    file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {res.retcode}")
+                state["last_trail"] = trail_price
+
 
     def check_and_close_position(self, position):
         rates = self.strategy.get_rates()
