@@ -97,9 +97,9 @@ class Trader:
         allocation = STRATEGY_ALLOCATION.get(self.strategy_name, 1.0)  # например, 0.2 для 20%
         allocated_equity = full_equity * allocation
         file_logger.info(
-            f"{self.symbol}: total_equity={full_equity:.2f}, allocation={allocation*100:.0f}%, "
+            f"Стратегия {self.strategy_name}: {self.symbol}: total_equity={full_equity:.2f}, allocation={allocation*100:.0f}%, "
             f"allocated_equity={allocated_equity:.2f}"
-            )
+        )
 
         # до того, как мы рассчитываем лот
         if account and account.margin_free < allocated_equity * MIN_FREE_MARGIN_RATIO:
@@ -165,9 +165,14 @@ class Trader:
         symbol_info = mt5.symbol_info(self.symbol)
 
         # Determine lot size from risk amount and stop-loss
-        lot = self.strategy.calculate_lot(symbol_info, price, sl_price)
-        # Clamp lot within allowed bounds
-        lot = max(MIN_LOT, min(lot, MAX_LOT))
+        file_logger.info(
+            f"Стратегия {self.strategy_name}: рассчитываю lot на основе price={price:.5f}, "
+            f"sl_price={sl_price:.5f}, risk_amount={risk_amount:.2f}"
+        )
+        raw_lot = self.strategy.calculate_lot(symbol_info, price, sl_price)
+        file_logger.info(f"Стратегия {self.strategy_name}: raw_lot={raw_lot:.2f}")
+        lot = max(MIN_LOT, min(raw_lot, MAX_LOT))
+        file_logger.info(f"Стратегия {self.strategy_name}: lot после clamp [{MIN_LOT}, {MAX_LOT}] = {lot:.2f}")
 
         # Hard cap: max 3% of allocated equity used for margin per trade
         max_margin_per_trade = allocated_equity * 0.03
