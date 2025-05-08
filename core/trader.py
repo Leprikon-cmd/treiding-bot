@@ -10,6 +10,7 @@ from config.settings import ATR_SETTINGS, RISK_PER_TRADE, MIN_LOT, MAX_LOT
 from config.settings import BREAK_EVEN_ATR, TRAILING_ATR, TRAILING_STEP_ATR
 from config.settings import MAX_POSITIONS_PER_SYMBOL, DAILY_RISK_LIMIT, MAX_CONSECUTIVE_LOSSES, MIN_FREE_MARGIN_RATIO, MIN_ENTRY_INTERVAL_SEC
 from datetime import datetime, timedelta
+import math
 
 STRATEGY_ICONS = {
     "EMARSIVolumeStrategy": "🕰️",
@@ -167,6 +168,30 @@ class Trader:
         lot = self.strategy.calculate_lot(symbol_info, price, sl_price)
         # Clamp lot within allowed bounds
         lot = max(MIN_LOT, min(lot, MAX_LOT))
+
+        # Hard cap: max 3% of allocated equity used for margin per trade
+        max_margin_per_trade = allocated_equity * 0.03
+        # Estimate margin required for this lot
+        margin_req = mt5.order_calc_margin(
+            mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
+            self.symbol, lot, price
+        )
+        if margin_req is None:
+            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу для лота {lot}")
+        elif margin_req > max_margin_per_trade:
+            # Recalculate max lot based on margin cap
+            margin_per_lot = margin_req / lot
+            volume_step = symbol_info.volume_step
+            max_lot_by_margin = math.floor(max_margin_per_trade / margin_per_lot / volume_step) * volume_step
+            # Clamp within allowed bounds
+            max_lot_by_margin = max(MIN_LOT, min(max_lot_by_margin, lot))
+            file_logger.info(
+                f"{self.symbol}: lot reduced by margin cap from {lot:.2f} to {max_lot_by_margin:.2f}"
+            )
+            lot = max_lot_by_margin
+            if lot < MIN_LOT:
+                print(f"⚠️ {self.symbol}: лот слишком мал после ограничения маржи")
+                return
 
         print(f"🔎 {self.symbol}: риск={risk_amount:.2f}, SL={sl_points:.2f}, лот={lot}")
 
