@@ -124,6 +124,16 @@ class Trader:
             print(f"⚠️ {self.symbol}: подряд {self.consec_losses} убыточных сделок, входы заблокированы")
             return
 
+        # Multi-TF filter: require H4 trend alignment
+        rates_h4 = mt5.copy_rates_from(self.symbol, mt5.TIMEFRAME_H4, datetime.now(), 100)
+        if rates_h4:
+            df_h4 = pd.DataFrame(rates_h4)
+            sma_short = df_h4['close'].rolling(window=10).mean().iloc[-1]
+            sma_long = df_h4['close'].rolling(window=50).mean().iloc[-1]
+            if (signal == 'buy' and sma_short < sma_long) or (signal == 'sell' and sma_short > sma_long):
+                file_logger.info(f"{self.symbol}: H4 trend mismatch (sma10={sma_short:.5f}, sma50={sma_long:.5f}), вход {signal} отменён")
+                return
+
         # динамический расчет SL/TP на основе ATR (настройки для каждой стратегии)
         df_atr = pd.DataFrame(rates)
         df_atr['prev_close'] = df_atr['close'].shift(1)
@@ -176,27 +186,23 @@ class Trader:
 
         # Hard cap: max 3% of allocated equity used for margin per trade
         max_margin_per_trade = allocated_equity * 0.03
-        # Estimate margin required for this lot
-        margin_req = mt5.order_calc_margin(
+        # Estimate margin per lot step
+        volume_step = symbol_info.volume_step
+        test_lot = volume_step
+        margin_per_lot = mt5.order_calc_margin(
             mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
-            self.symbol, lot, price
+            self.symbol, test_lot, price
         )
-        if margin_req is None:
-            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу для лота {lot}")
-        elif margin_req > max_margin_per_trade:
-            # Recalculate max lot based on margin cap
-            margin_per_lot = margin_req / lot
-            volume_step = symbol_info.volume_step
+        if margin_per_lot is None:
+            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу за шаг лота {test_lot}")
+        else:
             max_lot_by_margin = math.floor(max_margin_per_trade / margin_per_lot / volume_step) * volume_step
-            # Clamp within allowed bounds
-            max_lot_by_margin = max(MIN_LOT, min(max_lot_by_margin, lot))
-            file_logger.info(
-                f"{self.symbol}: lot reduced by margin cap from {lot:.2f} to {max_lot_by_margin:.2f}"
-            )
-            lot = max_lot_by_margin
-            if lot < MIN_LOT:
-                print(f"⚠️ {self.symbol}: лот слишком мал после ограничения маржи")
+            if max_lot_by_margin < MIN_LOT:
+                print(f"⚠️ {self.symbol}: недостаточно маржи для минимального лота после ограничения маржи")
                 return
+            # Final lot is limited by both raw calculation and margin cap
+            lot = min(lot, max_lot_by_margin, MAX_LOT)
+            file_logger.info(f"{self.symbol}: lot capped by margin cap to {lot:.2f} (max allowed by margin: {max_lot_by_margin:.2f})")
 
         print(f"🔎 {self.symbol}: риск={risk_amount:.2f}, SL={sl_points:.2f}, лот={lot}")
 
