@@ -27,3 +27,6 @@ file_logger = logging.getLogger("file_logger")
 file_logger.setLevel(logging.INFO)
 file_logger.addHandler(file_handler)
 file_logger.addHandler(console_handler)
+
+# Alias console_logger for compatibility
+console_logger = file_logger
