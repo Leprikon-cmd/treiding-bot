@@ -13,7 +13,7 @@ class EMARSIVolumeStrategy(StrategyBase):
         self.volume_threshold = volume_threshold
 
     def get_timeframe(self):
-        return mt5.TIMEFRAME_H1  # ⏱ среднесрок
+        return mt5.TIMEFRAME_H4  # ⏱ среднесрок
 
     def get_rates(self):
         timeframe = self.get_timeframe()
