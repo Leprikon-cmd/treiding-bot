@@ -189,23 +189,28 @@ class Trader:
         max_margin_per_trade = allocated_equity * 0.03
         volume_step = symbol_info.volume_step
 
-        # Estimate margin required for one step (volume_step)
-        margin_per_step = mt5.order_calc_margin(
+        # Estimate margin required for 1.0 lot
+        margin_for_one_lot = mt5.order_calc_margin(
             mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
-            self.symbol, volume_step, price
+            self.symbol, 1.0, price
         )
-        if margin_per_step is None:
-            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу за шаг лота {volume_step}")
+        if margin_for_one_lot is None:
+            file_logger.error(f"{self.symbol}: не удалось рассчитать маржу для 1.0 лота")
             return
-        # Compute max number of steps within margin cap
-        max_steps = math.floor(max_margin_per_trade / margin_per_step)
+        # Compute maximum allowed lot under margin cap
+        allowed_lot = max_margin_per_trade / margin_for_one_lot
+        # Convert to steps
+        max_steps = math.floor(allowed_lot / volume_step)
         if max_steps <= 0:
             print(f"⚠️ {self.symbol}: недостаточно маржи для минимального лота после ограничения маржи")
             return
         max_lot_by_margin = max_steps * volume_step
         # Final lot is limited by both raw calculation and margin cap
         lot = min(lot, max_lot_by_margin, MAX_LOT)
-        file_logger.info(f"{self.symbol}: lot capped by margin cap to {lot:.2f} (max allowed by margin: {max_lot_by_margin:.2f})")
+        file_logger.info(
+            f"{self.symbol}: lot capped by margin cap to {lot:.2f} "
+            f"(max allowed by margin: {max_lot_by_margin:.2f})"
+        )
 
         print(f"🔎 {self.symbol}: риск={risk_amount:.2f}, SL={sl_points:.2f}, лот={lot}")
 
