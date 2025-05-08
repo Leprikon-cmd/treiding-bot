@@ -1,7 +1,3 @@
-
-from .entry_guards import EntryGuards, GuardError
-from utils.risk_manager import RiskManager
-from .mt5_broker import Mt5Broker
 from utils.logger import file_logger
 import MetaTrader5 as mt5
 from core.mt5_interface import send_order, close_order
@@ -60,8 +56,8 @@ class Trader:
             print(f"{emoji} {self.symbol} — ⚠️ нет данных")
             return
 
-        symbol_info = self.broker.symbol_info(self.symbol)
-        if not symbol_info or symbol_info.trade_mode != self.broker.SYMBOL_TRADE_MODE_FULL:
+        symbol_info = mt5.symbol_info(self.symbol)
+        if not symbol_info or symbol_info.trade_mode != mt5.SYMBOL_TRADE_MODE_FULL:
             print(f"{emoji} {self.symbol} — ⚠️ торговля запрещена")
             return
 
@@ -70,7 +66,7 @@ class Trader:
             print(f"{emoji} {self.symbol} — ⚠️ спред слишком высокий")
             return
 
-        positions = self.broker.positions_get(symbol=self.symbol)
+        positions = mt5.positions_get(symbol=self.symbol)
         current_position = None
         if positions:
             for pos in positions:
@@ -98,45 +94,14 @@ class Trader:
             else:
                 print(f"{emoji} {self.symbol} — ❌ ⛔")
 
-    
-    def _try_open_order(self, rates):
-        account = self.broker.get_account_info()
-        positions = self.broker.get_open_positions(symbol=self.symbol)  # предполагаем, что метод добавлен
-
-        guards = EntryGuards(account, positions, settings={"min_free_margin": 100, "max_positions": 5})
-        try:
-            guards.check_all()
-        except GuardError as e:
-            print(f"[GUARD] {e}")
+    def _try_open_order(self, signal, rates):
+        # Entry interval guard
+        now = datetime.now()
+        if self.last_entry_time and (now - self.last_entry_time).total_seconds() < MIN_ENTRY_INTERVAL_SEC:
+            print(f"⚠️ {self.symbol}: слишком частые входы, жди {MIN_ENTRY_INTERVAL_SEC} сек")
             return
 
-        signal = self.strategy.check_entry_signal(rates)
-        if not signal:
-            return
-
-        atr = self._compute_atr(rates)  # предполагается, что уже есть
-        risk_mgr = RiskManager()
-        lot = risk_mgr.get_lot(account.equity, atr, abs(signal.sl - rates[-1]["close"]))
-
-        request = {
-            "symbol": self.symbol,
-            "volume": lot,
-            "type": self._get_order_type(signal.direction),
-            "price": self._get_price(signal.direction),
-            "sl": signal.sl,
-            "tp": signal.tp,
-            "deviation": 10,
-            "magic": 123456,
-            "comment": "entry",
-            "type_time": 0,
-            "type_filling": 1,
-        }
-
-        result = self.broker.send_order(request)
-        print(f"[ORDER] Sent: {result}")
-    
-
-        account = self.broker.account_info()
+        account = mt5.account_info()
         full_equity = account.equity if account else 40000
         allocation = STRATEGY_ALLOCATION.get(self.strategy_name, 1.0)  # например, 0.2 для 20%
         allocated_equity = full_equity * allocation
@@ -153,7 +118,7 @@ class Trader:
             return
 
         # Max positions per symbol guard
-        positions = self.broker.positions_get(symbol=self.symbol) or []
+        positions = mt5.positions_get(symbol=self.symbol) or []
         if len(positions) >= MAX_POSITIONS_PER_SYMBOL:
             print(f"⚠️ {self.symbol}: уже открыто {len(positions)} позиций, максимум {MAX_POSITIONS_PER_SYMBOL}")
             return
@@ -169,7 +134,7 @@ class Trader:
             return
 
         # Multi-TF filter: require H4 trend alignment
-        rates_h4 = self.broker.copy_rates_from(self.symbol, self.broker.TIMEFRAME_H4, datetime.now(), 100)
+        rates_h4 = mt5.copy_rates_from(self.symbol, mt5.TIMEFRAME_H4, datetime.now(), 100)
         if rates_h4 is not None and len(rates_h4) > 0:
     
             df_h4 = pd.DataFrame(rates_h4)
@@ -193,7 +158,7 @@ class Trader:
         tp_multiplier = strategy_atr.get('tp_multiplier', 3.0)
         atr = df_atr['tr'].rolling(window=period).mean().iloc[-1]
 
-        symbol_info = self.broker.symbol_info(self.symbol)
+        symbol_info = mt5.symbol_info(self.symbol)
         point = symbol_info.point
 
         # SL/TP в пунктах (расчёт через ATR)
@@ -201,7 +166,7 @@ class Trader:
         tp_points = (tp_multiplier * atr) / point
         print(f"ATR={atr:.5f}, SL_pts={sl_points:.2f}, TP_pts={tp_points:.2f}")
 
-        tick = self.broker.symbol_info_tick(self.symbol)
+        tick = mt5.symbol_info_tick(self.symbol)
         if tick is None:
             print(f"❌ {self.symbol}: ошибка тика")
             return
@@ -209,7 +174,7 @@ class Trader:
         price = tick.ask if signal == 'buy' else tick.bid
         # рассчитываем цену стоп-лосса в валютных единицах
         sl_price = price - sl_points * point if signal == 'buy' else price + sl_points * point
-        account_info = self.broker.account_info()
+        account_info = mt5.account_info()
         full_equity = account_info.equity if account_info else 40000
         allocation = STRATEGY_ALLOCATION.get(self.strategy_name, 1.0)
         allocated_equity = full_equity * allocation
@@ -217,7 +182,7 @@ class Trader:
         risk_amount = allocated_equity * RISK_PER_TRADE
         file_logger.info(f"{self.symbol}: equity full={full_equity:.2f}, allocation={allocation*100:.0f}%, allocated={allocated_equity:.2f}, risk_amount={risk_amount:.2f}")
         
-        symbol_info = self.broker.symbol_info(self.symbol)
+        symbol_info = mt5.symbol_info(self.symbol)
 
         # Determine lot size from risk amount and stop-loss
         file_logger.info(
@@ -234,8 +199,8 @@ class Trader:
         volume_step = symbol_info.volume_step
 
         # Estimate margin required for 1.0 lot
-        margin_for_one_lot = self.broker.order_calc_margin(
-            self.broker.ORDER_TYPE_BUY if signal == 'buy' else self.broker.ORDER_TYPE_SELL,
+        margin_for_one_lot = mt5.order_calc_margin(
+            mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
             self.symbol, 1.0, price
         )
         if margin_for_one_lot is None:
@@ -267,7 +232,7 @@ class Trader:
         result = send_order(
             self.symbol,
             lot,
-            self.broker.ORDER_TYPE_BUY if signal == 'buy' else self.broker.ORDER_TYPE_SELL,
+            mt5.ORDER_TYPE_BUY if signal == 'buy' else mt5.ORDER_TYPE_SELL,
             price,
             sl_points=sl_points,
             tp_points=tp_points,
@@ -298,8 +263,8 @@ class Trader:
         enforcing minimal stop distance and treating CODE 10025 (NO_CHANGES) as success.
         """
         # Retrieve symbol parameters and current market tick
-        symbol_info = self.broker.symbol_info(self.symbol)
-        tick = self.broker.symbol_info_tick(self.symbol)
+        symbol_info = mt5.symbol_info(self.symbol)
+        tick = mt5.symbol_info_tick(self.symbol)
         if not symbol_info or not tick:
             return
 
@@ -307,7 +272,7 @@ class Trader:
         stop_level = symbol_info.trade_stops_level
         min_dist = stop_level * point
 
-        is_buy = position.type == self.broker.ORDER_TYPE_BUY
+        is_buy = position.type == mt5.ORDER_TYPE_BUY
         # For SL calculations, buy uses bid, sell uses ask
         price_for_sl = tick.bid if is_buy else tick.ask
 
@@ -326,17 +291,17 @@ class Trader:
             # Validate new SL: must differ sufficiently and respect minimal distance
             if abs(be_price - price_for_sl) >= min_dist and abs(be_price - position.sl) >= point:
                 req = {
-                    "action": self.broker.TRADE_ACTION_SLTP,
+                    "action": mt5.TRADE_ACTION_SLTP,
                     "symbol": self.symbol,
                     "position": ticket,
                     "sl": be_price,
                     "tp": position.tp,
                     "deviation": 10,
-                    "type_filling": self.broker.ORDER_FILLING_FOK
+                    "type_filling": mt5.ORDER_FILLING_FOK
                 }
-                res = self.broker.order_send(req)
+                res = mt5.order_send(req)
                 # Treat NO_CHANGES (10025) as success
-                if res.retcode in (self.broker.TRADE_RETCODE_DONE, self.broker.TRADE_RETCODE_NO_CHANGES):
+                if res.retcode in (mt5.TRADE_RETCODE_DONE, mt5.TRADE_RETCODE_NO_CHANGES):
                     print(f"🔒 {self.symbol}: SL updated #{ticket} @ {be_price:.5f}")
                 else:
                     file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {res.retcode}")
@@ -355,16 +320,16 @@ class Trader:
             if abs(trail_price - price_for_sl) >= min_dist and \
                (state["last_trail"] is None or abs(trail_price - state["last_trail"]) >= point):
                 req = {
-                    "action": self.broker.TRADE_ACTION_SLTP,
+                    "action": mt5.TRADE_ACTION_SLTP,
                     "symbol": self.symbol,
                     "position": ticket,
                     "sl": trail_price,
                     "tp": position.tp,
                     "deviation": 10,
-                    "type_filling": self.broker.ORDER_FILLING_FOK
+                    "type_filling": mt5.ORDER_FILLING_FOK
                 }
-                res = self.broker.order_send(req)
-                if res.retcode in (self.broker.TRADE_RETCODE_DONE, self.broker.TRADE_RETCODE_NO_CHANGES):
+                res = mt5.order_send(req)
+                if res.retcode in (mt5.TRADE_RETCODE_DONE, mt5.TRADE_RETCODE_NO_CHANGES):
                     print(f"↔️ {self.symbol}: трейл #{ticket} @ {trail_price:.5f}")
                 else:
                     file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {res.retcode}")
@@ -387,12 +352,12 @@ class Trader:
             self.close_position(position)
 
     def close_position(self, position):
-        price = self.broker.symbol_info_tick(self.symbol)
+        price = mt5.symbol_info_tick(self.symbol)
         if price is None:
             file_logger.error(f"❌ Ошибка тика для закрытия {self.symbol}")
             return
 
-        current_price = price.ask if position.type == self.broker.ORDER_TYPE_BUY else price.bid
+        current_price = price.ask if position.type == mt5.ORDER_TYPE_BUY else price.bid
         result = close_order(position)
         if result:
             print(f"✅ {self.symbol}: позиция закрыта")
