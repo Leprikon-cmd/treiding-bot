@@ -144,9 +144,12 @@ class Trader:
         # рассчитываем цену стоп-лосса в валютных единицах
         sl_price = price - sl_points * point if signal == 'buy' else price + sl_points * point
         account_info = mt5.account_info()
-        total_equity = account_info.equity if account_info else 40000
-        # Calculate risk amount based on configured percentage
-        risk_amount = total_equity * RISK_PER_TRADE
+        full_equity = account_info.equity if account_info else 40000
+        allocation = STRATEGY_ALLOCATION.get(self.strategy_name, 1.0)
+        allocated_equity = full_equity * allocation
+        # Calculate risk amount based on configured percentage of allocated equity
+        risk_amount = allocated_equity * RISK_PER_TRADE
+        file_logger.info(f"{self.symbol}: equity full={full_equity:.2f}, allocation={allocation*100:.0f}%, allocated={allocated_equity:.2f}, risk_amount={risk_amount:.2f}")
         
         symbol_info = mt5.symbol_info(self.symbol)
 
@@ -240,6 +243,8 @@ class Trader:
                 else:
                     file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {res.retcode}")
                 state["be"] = True
+                file_logger.info(f"{self.symbol}: BE SL → {be_price:.5f}, PROFIT={profit:.5f}")
+                file_logger.info(f"{self.symbol}: TRAIL SL → {trail_price:.5f}")
 
         # Trailing stop logic
         trail_mult = TRAILING_ATR.get(self.strategy_name, TRAILING_ATR)
@@ -266,6 +271,8 @@ class Trader:
                 else:
                     file_logger.error(f"❌ Ошибка модификации SL/TP #{ticket}: {res.retcode}")
                 state["last_trail"] = trail_price
+                file_logger.info(f"{self.symbol}: BE SL → {be_price:.5f}, PROFIT={profit:.5f}")
+                file_logger.info(f"{self.symbol}: TRAIL SL → {trail_price:.5f}")
 
 
     def check_and_close_position(self, position):
